@@ -130,7 +130,7 @@ The points allowed and points scored totals for the 2020 and 2019 season have be
 
 For this, the data needs to be copied and pasted from the same website above and put into a .csv file. My files are in the GitHub repository.
 
-The offense and defense data is imported, then stripped of Takeaway and Turnover data in two different tables, then using an inner join function to pair the data correctly
+The offense and defense data is imported, then stripped of Takeaway and Turnover data in two different tables, then using an inner join function to pair the data correctly. TO are turnovers (Offensive) and TA are takeaways (Defensive)
 
 ```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
 # load in the csv with the pathways of the files on you computer 
@@ -162,7 +162,7 @@ TO_df[cols.num] <- sapply(TO_df[cols.num],as.numeric)
 
 # now lets join this data with the original NFL data frame of the 2019 data 
 nfl_df3 <- inner_join(nfl_df,TO_df,by = "Tm")
-head(nfl_df3)
+head(nfl_df3 %>% select(Tm,W,L,PF,PA,TO,TA))
 ```
 
 Then using the turnover and takeaway data from 2019 to make an updated linear model with Point Scored and Points Allowed. Calling it tot_lm for total (all variables (that is planned to be used)) linear model for predicting wins with 2019 data. totL_lm is for predicting losses with 2019 data 
