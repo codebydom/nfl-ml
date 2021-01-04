@@ -1,0 +1,396 @@
+---
+title: "Predicting Win/Loss Totals of NFL Teams in 2019 and 2020"
+author: "Dom Pizzano"
+date: "1/4/2021"
+output:
+  html_document:
+    df_print: paged
+---
+### Predicting Total Wins and losses of NFL Teams from the 2019 and 2020 Seasons using Linear Regression 
+
+## Overview:  
+Predicting Wins and losses for NFL teams given the total points scored and total points allowed. Then adding Turnover (Offense) and Takeaway (Defense) Data to see if those can be used to help better predict a team's total wins and losses for a Season. Will be using mainly the 2019 data to make a linear regression model predicting the Wins and Losses, and then compare that model to the 2020 Season to see if it is applicable.
+
+
+## Methods/Analysis:
+
+First is to get the data, the NFL season data is from <https://www.pro-football-reference.com/years/2019/index.htm>, the data will be retrieved using web scraping tools and functions to parse out the data from the HTML.
+
+Here is the data from the 2019 season, which comes in 2 HTML tables, one for the AFC and one for the NFC, so it is necessary to parse each table then combine them into one data frame. Also,  unnecessary data rows will need to be removed from the data set. 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+library(Metrics) 
+library(tidyverse)
+library(caret)
+library(data.table)
+library(stats)
+library(rvest)
+```
+```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+#make call to the website you want to parse data from
+url <- "https://www.pro-football-reference.com/years/2019/index.htm"
+#read in the html
+h <- read_html(url)
+#get the table element from the html 
+tab <- h %>% html_nodes("table")
+# read the two tables in (one for AFC and one for NFC) using html_table()
+afc <- html_table(tab[1])
+nfc <- html_table(tab[2])
+# convert to data frames
+afc <- as.data.frame(afc)
+nfc <- as.data.frame(nfc)
+# get rid of the extra division names in the table and for some reason the OR function is not working
+afc <- afc %>% filter(Tm!="AFC North") %>% 
+  filter(Tm!="AFC East") %>% 
+  filter(Tm!="AFC South") %>% 
+  filter(Tm!="AFC West")
+nfc <- nfc %>% filter(Tm!="NFC North") %>% 
+  filter(Tm!="NFC East") %>% 
+  filter(Tm!="NFC South") %>% 
+  filter(Tm!="NFC West")
+#combine the afc and nfc data frames
+nfl_df <- rbind(afc,nfc)
+```
+
+There is also a need to convert the columns into numeric data types, and get rid of special characters in the Team name column. 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+#get rid of special characters and spaces in team names 
+nfl_df$Tm<- str_replace_all(nfl_df$Tm, "[^[:alnum:]]", "")
+
+
+# convert the strings to integers for the columns being analyzed
+cols.num <- c("W","L","PF","PA","SoS")
+nfl_df[cols.num] <- sapply(nfl_df[cols.num],as.numeric)
+nfl_rows <- nrow(nfl_df)
+head(nfl_df,n=5)
+```
+
+Need to replace team name changes, since the Oakland Raiders became the Las Vegas Raiders and the Washington R****** became the Washington Football Team.
+
+```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE,tidy=TRUE}
+nfl_df$Tm<- str_replace_all(nfl_df$Tm, "OaklandRaiders", "LasVegasRaiders")
+nfl_df$Tm<- str_replace_all(nfl_df$Tm, "WashingtonRedskins", "WashingtonFootballTeam")
+```
+
+There are `r nfl_rows` rows in the 2019 dataset, one row for each NFL team.
+
+Now that the 2019 Data for each NFL team is available in a data frame, the data frame will be used to build linear models used to predict wins and losses.
+
+The first NFL 2019 Linear regression model is labeled nfl_lm for the wins and nfl_lm_l for the losses.
+
+```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE,tidy=TRUE}
+nfl_lm <- lm(W ~ PF + PA , data = nfl_df)
+nfl_lm_l <- lm(L ~ PF + PA , data = nfl_df)
+```
+
+With the linear models created from the 2019 data, we are now going to bring in 2020 NFL data, using the same URL from above and similarly processing the data. 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+# repeat the same data processes as above for 2020
+
+#make call to the website you want to parse data from
+url <- "https://www.pro-football-reference.com/years/2020/index.htm"
+#read in the html
+h <- read_html(url)
+#check to make sure the class is right
+#get the table element from the html 
+tab <- h %>% html_nodes("table")
+# read the two tables in (one for AFC and one for NFC) using html_table()
+afc2 <- html_table(tab[1])
+nfc2 <- html_table(tab[2])
+# convert to data frames
+afc2 <- as.data.frame(afc2)
+nfc2 <- as.data.frame(nfc2)
+# get rid of the extra division names in the table and for some reason the OR function is not working
+afc2 <- afc2 %>% filter(Tm!="AFC North") %>% 
+  filter(Tm!="AFC East") %>% 
+  filter(Tm!="AFC South") %>% 
+  filter(Tm!="AFC West")
+nfc2 <- nfc2 %>% filter(Tm!="NFC North") %>% 
+  filter(Tm!="NFC East") %>% 
+  filter(Tm!="NFC South") %>% 
+  filter(Tm!="NFC West")
+#combine the afc and nfc data frames, 2 is for the 2020 data 
+nfl_df2 <- rbind(afc2,nfc2)
+#getting rid of the special characters and spaces in the first column for teams 
+nfl_df2$Tm<- str_replace_all(nfl_df2$Tm, "[^[:alnum:]]", "")
+
+# now instead of creating linear models from this data, we are just going to create new datasets to be analyzed
+
+## convert the strings to integers for the columns being analyzed
+cols.num <- c("W","L","PF","PA","SoS")
+nfl_df2[cols.num] <- sapply(nfl_df2[cols.num],as.numeric)
+nfl_rows2 <- nrow(nfl_df2)
+head(nfl_df2,n=5)
+```
+There are `r nfl_rows2` rows in the 2020 dataset, one row for each NFL team, matching the 2019 dataset. 
+
+The points allowed and points scored totals for the 2020 and 2019 season have been accumulated, next is getting the Offensive Turnover and Defensive Takeaway totals into.
+
+For this, the data needs to be copied and pasted from the same website above and put into a .csv file. My files are in the GitHub repository.
+
+The offense and defense data is imported, then stripped of Takeaway and Turnover data in two different tables, then using an inner join function to pair the data correctly
+
+```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+# load in the csv with the pathways of the files on you computer 
+off_19 <- read.csv("C:/Users/dom/Documents/education/data-science/r/nfl-analysis/off-data-2019.csv",header = T)
+
+def_19 <- read.csv("C:/Users/dom/Documents/education/data-science/r/nfl-analysis/def-data-2019.csv",header = T)
+
+# change column names to the first row
+colnames(off_19)<-off_19[1,]
+colnames(def_19)<-def_19[1,]
+# remove the first row
+off_19 <- off_19[-1,]
+def_19 <- def_19[-1,]
+
+#remove spaces in Tm (team) to make sure we can use it to join the team win/loss data
+off_19$Tm <-  str_replace_all(off_19$Tm,"[^[:alnum:]]", "")
+def_19$Tm <-  str_replace_all(def_19$Tm,"[^[:alnum:]]", "")
+
+# now we are going to get the turn over data data from the offense and defense by sub setting the data frames into select columns, then joining them
+off_to <- off_19 %>% select(Tm,TO)
+def_to <- def_19 %>% select(Tm,TO)
+TO_df <- inner_join(off_to,def_to,by = "Tm")
+# here TO.x is offensive turnover lost, TO.y is defensive takeaways
+colnames(TO_df) <- c("Tm","TO","TA")
+
+#make sure numeric columns are numbers 
+cols.num <- c("TO","TA")
+TO_df[cols.num] <- sapply(TO_df[cols.num],as.numeric)
+
+# now lets join this data with the original NFL data frame of the 2019 data 
+nfl_df3 <- inner_join(nfl_df,TO_df,by = "Tm")
+head(nfl_df3)
+```
+
+Then using the turnover and takeaway data from 2019 to make an updated linear model with Point Scored and Points Allowed. Calling it tot_lm for total (all variables (that is planned to be used)) linear model for predicting wins with 2019 data. totL_lm is for predicting losses with 2019 data 
+
+```{r echo=TRUE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+tot_lm <- lm(W ~ PF + PA + TO + TA, data=nfl_df3)
+totL_lm <- lm(L ~ PF + PA + TO + TA, data=nfl_df3)
+```
+
+Importing 2020 data to see how the linear model works at predicting wins and losses for the 2020 season, from 2019 training data.
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+off_20 <- read.csv("C:/Users/dom/Documents/education/data-science/r/nfl-analysis/off-2020.csv",header = T)
+
+def_20 <- read.csv("C:/Users/dom/Documents/education/data-science/r/nfl-analysis/def-2020.csv",header = T)
+
+# change column names to the first row
+colnames(off_20)<-off_20[1,]
+colnames(def_20)<-def_20[1,]
+# remove the first row
+off_20 <- off_20[-1,]
+def_20 <- def_20[-1,]
+#remove spaces in Tm to make sure we can use it to join the team win/loss data
+off_20$Tm <-  str_replace_all(off_20$Tm,"[^[:alnum:]]", "")
+def_20$Tm <-  str_replace_all(def_20$Tm,"[^[:alnum:]]", "")
+
+#select the 2020 turnover data
+off_to2 <- off_20 %>% select(Tm,TO)
+def_to2 <- def_20 %>% select(Tm,TO)
+# join the offense and def tables into one table 
+TO_df2 <- inner_join(off_to2,def_to2,by = "Tm")
+
+# here TO.x is offensive turnover lost, TO.y is defensive takeaways
+colnames(TO_df2) <- c("Tm","TO","TA")
+
+#make sure columns are numbers 
+cols.num <- c("TO","TA")
+TO_df2[cols.num] <- sapply(TO_df2[cols.num],as.numeric)
+
+# now lets join this data with the original NFL data frame
+
+nfl_df4 <- inner_join(nfl_df2,TO_df2,by = "Tm")
+```
+
+## Results:
+
+All the data and models are created, now to use predict() function and newdata from 2019 and 2020 NFL seasons to see how well the linear models can predict:
+
+(Linear model using Points Allowed and Points Scored Variables)  
+
+1.) Total Wins for each NFL Team in 2019  
+  
+2.) Total Losses for each NFL Team in 2019  
+  
+3.) Total Wins for each NFL Team in 2020
+
+4.) Total Losses for each NFL Team in 2020
+
+(Linear model using Points Allowed, Points Scored, Takeaways, Turnovers Variables)  
+
+5.) Total Wins for each NFL Team in 2019  
+  
+6.) Total Losses for each NFL Team in 2019  
+  
+7.) Total Wins for each NFL Team in 2020
+
+8.) Total Losses for each NFL Team in 2020
+
+
+#### (Linear model using Points Allowed and Points Scored Variables)
+
+
+First, to see if the P values are significant enough to use the linear model in the calculation 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+# Wins linear model
+summary(nfl_lm)
+# losses linear model
+summary(nfl_lm_l)
+```
+
+With Both of these linear models, the variable Points For and Points Against have a high significance with a P-value under .001. Meaning these variables can be used for predicting total wins.
+
+Create a newdata frame with the 2019 data to run the predictions for the 2019 Season, then adding the predictions to a compare table to see how it matches up to the actuals from the 2019 season. (w_p is predicted wins and l_p is predicted losses)
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+newdata<- data.frame(PF = nfl_df$PF,PA= nfl_df$PA)
+#predict using nfl linear model above and newdata
+w_pred <- predict(nfl_lm,newdata)
+l_pred <- predict(nfl_lm_l,newdata)
+compare<- nfl_df %>% select(Tm,W,L,PF,PA)
+compare$w_p <- w_pred
+compare$l_p <- l_pred
+head(compare,n=10)
+```
+
+Now to run a Root Means Square Error function comparing the actuals to the predicted so see how accurate the predictions were. 
+
+1.)
+2019 Wins vs 2019 Predicted Wins:
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+RMSE(nfl_df$W,w_pred) 
+```
+- Meaning on average the prediction of wins for 16 win season is off by 1.53 wins.
+
+2.)
+2019 losses vs 2019 Predicted Losses:
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+RMSE(nfl_df$L,l_pred)  
+```
+- Meaning on average the prediction of losses for 16 game season is off by 1.47 losses.
+
+Now to run the same 2019 model on the 2020 data to see if it compares. 
+
+Here is a sample of the actuals vs the predicted wins and losses for the 2020 season:
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+newdata2 <- data.frame(PF = nfl_df2$PF,PA= nfl_df2$PA)
+w_pred2 <- predict(nfl_lm,newdata2)
+l_pred2 <- predict(nfl_lm_l,newdata2)
+compare2020 <- nfl_df2 %>% select(Tm,W,L,PF,PA)
+compare2020$w_p <- w_pred2
+compare2020$l_p <- l_pred2
+head(compare2020,n=10)
+```
+
+3.)
+2020 Actual Wins vs Predicted wins 
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+RMSE(nfl_df2$W,w_pred2)
+```
+- Meaning on average was off by predicting actual wins by 1.49, .04 more accurate on average than 2019 predictions.
+  
+4.)
+2020 Actual losses vs Predicted Losses 
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+RMSE(nfl_df2$L,l_pred2)
+```
+- Meaning on average was off by predicting actual losses by 1.45, .03 more accurate on average than 2019 predictions. Very similar to one another.
+
+
+#### (Linear model using Points Allowed, Points Scored, Takeaways, Turnovers Variables)  
+
+Let's compare the four linear models to see if the new linear model is significant enough to use with the anova() function.
+
+Comparing Wins Linear Models
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+anova(nfl_lm,tot_lm)
+```
+
+Comparing Losses Linear Models
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+anova(nfl_lm_l,totL_lm)
+```
+
+Both comparisons show that the new linear model is more accurate to use with the P-value under .05. 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+summary(tot_lm)
+summary(totL_lm)
+```
+With the *** indication in the P-values, one can see that the added variables are significant enough to be used in a model, all variables being at least under .05 P-value. 
+
+Now to predict 2019 data with the updated more accurate linear model.
+
+5.) 
+2019 Actual wins vs Predicted total wins with Updated model
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+newdata3 <- data.frame(PF = nfl_df3$PF,PA=nfl_df3$PA,TO = nfl_df3$TO,TA = nfl_df3$TA)
+predict_w <- predict(tot_lm,newdata3)
+RMSE(nfl_df3$W,predict_w)
+```
+- Meaning that on average the prediction was off by 1.27, .2+ more accurate than the original linear model.
+
+
+6.) 
+2019 Actual losses vs Predicted total losses with Updated model
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+predict_l <- predict(totL_lm,newdata3)
+RMSE(nfl_df3$L,predict_l)
+```
+- Meaning that on average the prediction was off by 1.17 losses, not bad, again an improvement from the original linear model by .3.
+
+Now using it on the 2020 Season data that now includes takeaways and turnovers. 
+
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+newdata4 <- data.frame(PF = nfl_df4$PF,PA=nfl_df4$PA,TO = nfl_df4$TO,TA = nfl_df4$TA)
+```
+
+
+7.)
+2020 Actual wins vs Predicted total wins with Updated model
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+predict_w2 <- predict(tot_lm,newdata4)
+RMSE(nfl_df4$W,predict_w2)
+```
+- Meaning this is less accurate than the original model by .01 with an RMSE of 1.5
+
+8.)
+2020 Actual losses vs Predicted total losses with Updated model
+```{r echo=FALSE,comment = "", prompt=FALSE,message=FALSE,warning=FALSE}
+predict_l2 <- predict(totL_lm,newdata4)
+RMSE(nfl_df4$L,predict_l2)
+```
+- Meaning that the predicted wins are off by 1.52 wins, again an increase from the original linear model using just Points for and Points allowed.
+
+## Conclusion:  
+The overall conclusion from our data is that for the 2020 Season, using just Points allowed and Points for is more accurate at predicting total season wins and losses than adding turnover and takeaway variables to the linear model. For the 2020 NFL Season Data:  
+**Original Model RMSEs: (W:1.49, L:1.45) vs Updated Model RMSEs: (W: 1.5,L: 1.52)**
+
+For the 2019 season, it is more accurate to use a linear model with Points allowed, Points for, Turnovers, and Takeaways in predicting the total wins and losses for the season. And that updating the model with the Turnover and Takeaway variable significantly improved the RMSE for predicting both wins and losses by nearly .3. For the 2019 Season Data:  
+**Original Model RMSEs: (W:1.53, L:1.47) vs Updated Model RMSEs: (W: 1.27,L: 1.17)** 
+
+The 2019 Linear Model with Points For and Points Against variable better predicted the Win/Loss totals for the 2020 data than the 2019 data, interesting because the model was trained and developed using the 2019 data but better predicted the 2020 season win/loss totals. However the updated model with Point For, Points Against, Turnovers, and Takeaways only significantly improved the predictions with the 2019 data but decreased the accuracy of predictions in the 2020 season, but by less than .1 RMSE. 
+
+For future considerations, getting more data and seeing if 2019 was an anomaly where turnover and takeaways factored more into wins/losses, or if usually, they do not contribute heavily towards overall wins/losses for the whole season.  
+
+  
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
